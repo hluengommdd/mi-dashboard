@@ -33,6 +33,9 @@ const App = () => {
     const [lastSync, setLastSync] = useState(null);
     const [syncStatus, setSyncStatus] = useState('🔄 Sincronizando...');
     const [toasts, setToasts] = useState([]);
+    const [showGeneralAverage, setShowGeneralAverage] = useState(true);
+    const [dateFilterFrom, setDateFilterFrom] = useState('');
+    const [dateFilterTo, setDateFilterTo] = useState('');
 
     const formatObsDate = (dateString) => {
         if (!dateString) return '';
@@ -240,6 +243,16 @@ const App = () => {
         return [...teachersData].sort((a, b) => b.porcentaje_total - a.porcentaje_total).slice(0, 5);
     }, [teachersData]);
 
+    const filteredData = useMemo(() => {
+        if (!dateFilterFrom && !dateFilterTo) return teachersData;
+        return teachersData.filter(obs => {
+            const obsDate = new Date(obs.fecha);
+            const from = dateFilterFrom ? new Date(dateFilterFrom) : new Date(0);
+            const to = dateFilterTo ? new Date(dateFilterTo) : new Date(9999, 11, 31);
+            return obsDate >= from && obsDate <= to;
+        });
+    }, [teachersData, dateFilterFrom, dateFilterTo]);
+
     // --- ACTUALIZACIÓN DE GRÁFICOS ---
     useEffect(() => {
         if (!displayData) return;
@@ -248,7 +261,7 @@ const App = () => {
         if (radarInst.current) radarInst.current.destroy();
         const radarDatasets = [];
 
-        if (currentView !== 'general' && generalAverages) {
+        if (currentView !== 'general' && generalAverages && showGeneralAverage) {
             radarDatasets.push({
                 label: 'Promedio General',
                 data: [
@@ -292,7 +305,7 @@ const App = () => {
 
         const detailedDatasets = [];
 
-        if (currentView !== 'general' && generalAverages) {
+        if (currentView !== 'general' && generalAverages && showGeneralAverage) {
             detailedDatasets.push({
                 label: 'Promedio General',
                 data: displayData.items.map(i => generalByItem[i.nombre] ?? null),
@@ -322,7 +335,7 @@ const App = () => {
             },
             options: { responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, max: 100, ticks: { display: false } } } }
         });
-    }, [displayData, currentView, generalAverages]);
+    }, [displayData, currentView, generalAverages, showGeneralAverage]);
 
     // --- MANEJO DE BÚSQUEDA ---
     const handleSearch = (e) => {
@@ -422,6 +435,48 @@ const App = () => {
                         )}
                     </div>
 
+                    <div className="filter-card" style={{ marginBottom: '1.5rem' }}>
+                        <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px', display: 'block' }}>FILTROS AVANZADOS:</label>
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Desde:</label>
+                                <input 
+                                    type="date" 
+                                    value={dateFilterFrom} 
+                                    onChange={(e) => setDateFilterFrom(e.target.value)}
+                                    style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid rgba(148, 163, 184, 0.22)', marginTop: '4px', fontSize: '0.9rem' }}
+                                />
+                            </div>
+                            <div>
+                                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Hasta:</label>
+                                <input 
+                                    type="date" 
+                                    value={dateFilterTo} 
+                                    onChange={(e) => setDateFilterTo(e.target.value)}
+                                    style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid rgba(148, 163, 184, 0.22)', marginTop: '4px', fontSize: '0.9rem' }}
+                                />
+                            </div>
+                        </div>
+                        {(dateFilterFrom || dateFilterTo) && (
+                            <button 
+                                onClick={() => { setDateFilterFrom(''); setDateFilterTo(''); }}
+                                style={{ 
+                                    marginTop: '10px', 
+                                    padding: '8px 12px', 
+                                    background: 'var(--gray-200)', 
+                                    color: 'var(--text-secondary)', 
+                                    border: 'none', 
+                                    borderRadius: '8px', 
+                                    cursor: 'pointer', 
+                                    fontSize: '0.8rem',
+                                    fontWeight: 600
+                                }}
+                            >
+                                ✕ Limpiar filtros
+                            </button>
+                        )}
+                    </div>
+
                     <div className="kpi-row">
                         <Tooltip text="Promedio general de todas las dimensiones evaluadas">
                             <div className="kpi-card kpi-total">
@@ -469,12 +524,56 @@ const App = () => {
 
                     <div className="charts-grid">
                         <div className="chart-card">
-                            <h3 style={{ fontSize: '0.95rem', marginBottom: '1.5rem' }}>Comparativa de Dimensiones</h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                                <h3 style={{ fontSize: '0.95rem', margin: 0 }}>Comparativa de Dimensiones</h3>
+                                {currentView !== 'general' && (
+                                    <button 
+                                        onClick={() => setShowGeneralAverage(!showGeneralAverage)}
+                                        style={{
+                                            padding: '6px 12px',
+                                            fontSize: '0.75rem',
+                                            fontWeight: 600,
+                                            border: `2px solid ${showGeneralAverage ? 'var(--primary)' : 'var(--gray-300)'}`,
+                                            background: showGeneralAverage ? 'var(--primary-lighter)' : 'transparent',
+                                            color: showGeneralAverage ? 'var(--primary)' : 'var(--text-secondary)',
+                                            borderRadius: '999px',
+                                            cursor: 'pointer',
+                                            transition: 'all 0.3s ease'
+                                        }}
+                                    >
+                                        {showGeneralAverage ? '✓' : '○'} Promedio General
+                                    </button>
+                                )}
+                            </div>
                             <div className="chart-container"><canvas ref={radarChartRef}></canvas></div>
+                            <div style={{ marginTop: '1rem', display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: '#2563eb' }}></div>
+                                    <span style={{ color: 'var(--text-secondary)' }}>Datos actuales</span>
+                                </div>
+                                {showGeneralAverage && currentView !== 'general' && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: 'rgba(100, 116, 139, 0.5)' }}></div>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Promedio General</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         <div className="chart-card">
                             <h3 style={{ fontSize: '0.95rem', marginBottom: '1.5rem' }}>Indicadores Específicos</h3>
                             <div className="chart-container"><canvas ref={detailedChartRef}></canvas></div>
+                            <div style={{ marginTop: '1rem', display: 'flex', gap: '16px', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: '#8b5cf6' }}></div>
+                                    <span style={{ color: 'var(--text-secondary)' }}>Datos actuales</span>
+                                </div>
+                                {showGeneralAverage && currentView !== 'general' && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                        <div style={{ width: '12px', height: '12px', borderRadius: '2px', background: 'rgba(100, 116, 139, 0.45)' }}></div>
+                                        <span style={{ color: 'var(--text-secondary)' }}>Promedio General</span>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 
