@@ -12,6 +12,17 @@ const App = () => {
     const [selectedObsId, setSelectedObsId] = useState('');
     const [selectedDocId, setSelectedDocId] = useState('');
     const [searchTerm, setSearchTerm] = useState('');
+    const [lastSync, setLastSync] = useState(null);
+    const [syncStatus, setSyncStatus] = useState('🔄 Sincronizando...');
+
+    const formatObsDate = (dateString) => {
+        if (!dateString) return '';
+        const d = new Date(dateString);
+        if (Number.isNaN(d.getTime())) return dateString;
+        const day = `${d.getDate()}`.padStart(2, '0');
+        const month = `${d.getMonth() + 1}`.padStart(2, '0');
+        return `${day}/${month}`;
+    };
 
     // Refs para los gráficos
     const radarChartRef = useRef(null);
@@ -19,10 +30,37 @@ const App = () => {
     const radarInst = useRef(null);
     const detailedInst = useRef(null);
 
+    // --- POLLING INTELIGENTE ---
+    const checkForNewData = async () => {
+        try {
+            const { data: latestData } = await supabase
+                .from('respuestas')
+                .select('timestamp')
+                .order('timestamp', { ascending: false })
+                .limit(1);
+
+            if (!latestData || latestData.length === 0) return false;
+            
+            const latestTimestamp = new Date(latestData[0].timestamp);
+            
+            if (!lastSync || latestTimestamp > lastSync) {
+                console.log('✅ NUEVOS DATOS detectados en Supabase');
+                return true;
+            }
+            
+            console.log('⏭️ Sin cambios en Supabase');
+            return false;
+        } catch (error) {
+            console.error('Error verificando cambios:', error);
+            return false;
+        }
+    };
+
     // --- CARGA DE DATOS ---
     useEffect(() => {
         const loadAllData = async () => {
             try {
+                setSyncStatus('🔄 Sincronizando...');
                 const [dRes, oRes, vDimRes, iRes, rRes, evoRes] = await Promise.all([
                     supabase.from('docentes').select('*'),
                     supabase.from('v_resultados_dimensiones').select('*'),
@@ -66,14 +104,27 @@ const App = () => {
                 const docsValidos = [...new Set(mappedData.map(o => o.docente_id))].filter(id => mappedData.filter(o => o.docente_id === id).length >= 2);
                 if (docsValidos.length > 0) setSelectedDocId(docsValidos[0]);
 
+                setLastSync(new Date());
+                setSyncStatus('✅ Sincronizado');
             } catch (error) {
                 console.error("Error cargando datos:", error);
+                setSyncStatus('❌ Error');
             } finally {
                 setLoading(false);
             }
         };
 
         loadAllData();
+
+        // Polling inteligente cada 30 segundos
+        const interval = setInterval(async () => {
+            const hasNewData = await checkForNewData();
+            if (hasNewData) {
+                await loadAllData();
+            }
+        }, 30000);
+
+        return () => clearInterval(interval);
     }, []);
 
     // --- LÓGICA DE CÁLCULO ---
@@ -113,6 +164,8 @@ const App = () => {
 
         return result;
     };
+
+    const generalAverages = useMemo(() => calculateAverages(teachersData), [teachersData]);
 
     const displayData = useMemo(() => {
         if (currentView === 'observacion') {
@@ -166,40 +219,83 @@ const App = () => {
 
         // Gráfico Radar Principal
         if (radarInst.current) radarInst.current.destroy();
+        const radarDatasets = [];
+
+        if (currentView !== 'general' && generalAverages) {
+            radarDatasets.push({
+                label: 'Promedio General',
+                data: [
+                    generalAverages.puntos.ambiente,
+                    generalAverages.puntos.interaccion,
+                    generalAverages.puntos.organizacion
+                ],
+                backgroundColor: 'rgba(148, 163, 184, 0.1)',
+                borderColor: 'rgba(100, 116, 139, 0.5)',
+                pointBackgroundColor: 'rgba(148, 163, 184, 0.7)',
+                borderWidth: 2,
+                fill: true
+            });
+        }
+
+        radarDatasets.push({
+            label: currentView === 'observacion' ? 'Docente' : 'Puntaje (%)',
+            data: [displayData.puntos.ambiente, displayData.puntos.interaccion, displayData.puntos.organizacion],
+            backgroundColor: 'rgba(37, 99, 235, 0.15)',
+            borderColor: '#2563eb',
+            borderWidth: 2,
+            pointBackgroundColor: '#2563eb'
+        });
+
         radarInst.current = new Chart(radarChartRef.current, {
             type: 'radar',
             data: {
                 labels: ['Ambiente', 'Interacción', 'Organización'],
-                datasets: [{
-                    label: 'Puntaje (%)',
-                    data: [displayData.puntos.ambiente, displayData.puntos.interaccion, displayData.puntos.organizacion],
-                    backgroundColor: 'rgba(37, 99, 235, 0.15)',
-                    borderColor: '#2563eb',
-                    borderWidth: 2,
-                    pointBackgroundColor: '#2563eb'
-                }]
+                datasets: radarDatasets
             },
             options: { responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, max: 100, ticks: { display: false } } } }
         });
 
         // Gráfico Detallado
         if (detailedInst.current) detailedInst.current.destroy();
+
+        const generalByItem = (generalAverages?.items || []).reduce((acc, item) => {
+            acc[item.nombre] = item.valor;
+            return acc;
+        }, {});
+
+        const detailedDatasets = [];
+
+        if (currentView !== 'general' && generalAverages) {
+            detailedDatasets.push({
+                label: 'Promedio General',
+                data: displayData.items.map(i => generalByItem[i.nombre] ?? null),
+                backgroundColor: 'rgba(148, 163, 184, 0.08)',
+                borderColor: 'rgba(100, 116, 139, 0.45)',
+                borderWidth: 2,
+                pointBackgroundColor: 'rgba(148, 163, 184, 0.7)',
+                spanGaps: true,
+                fill: true
+            });
+        }
+
+        detailedDatasets.push({
+            label: currentView === 'observacion' ? 'Docente' : 'Puntaje (%)',
+            data: displayData.items.map(i => i.valor),
+            backgroundColor: 'rgba(139, 92, 246, 0.1)',
+            borderColor: '#8b5cf6',
+            borderWidth: 2,
+            pointBackgroundColor: '#8b5cf6'
+        });
+
         detailedInst.current = new Chart(detailedChartRef.current, {
             type: 'radar',
             data: {
                 labels: displayData.items.map(i => i.nombre.substring(0, 15) + '...'),
-                datasets: [{
-                    label: 'Puntaje (%)',
-                    data: displayData.items.map(i => i.valor),
-                    backgroundColor: 'rgba(139, 92, 246, 0.1)',
-                    borderColor: '#8b5cf6',
-                    borderWidth: 2,
-                    pointBackgroundColor: '#8b5cf6'
-                }]
+                datasets: detailedDatasets
             },
             options: { responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, max: 100, ticks: { display: false } } } }
         });
-    }, [displayData]);
+    }, [displayData, currentView, generalAverages]);
 
     // --- MANEJO DE BÚSQUEDA ---
     const handleSearch = (e) => {
@@ -250,6 +346,15 @@ const App = () => {
                         />
                     </div>
 
+                    <div className="sync-indicator">
+                        <span className="sync-status">{syncStatus}</span>
+                        {lastSync && (
+                            <span className="sync-time">
+                                {lastSync.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        )}
+                    </div>
+
                     <div className="view-toggle">
                         <button className={`view-btn ${currentView === 'observacion' ? 'active' : ''}`} onClick={() => setCurrentView('observacion')}>Individual</button>
                         <button className={`view-btn ${currentView === 'docente' ? 'active' : ''}`} onClick={() => setCurrentView('docente')}>Promedios</button>
@@ -266,7 +371,9 @@ const App = () => {
                                 <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '10px', display: 'block' }}>REGISTRO DE OBSERVACIÓN:</label>
                                 <select value={selectedObsId} onChange={(e) => setSelectedObsId(e.target.value)}>
                                     {teachersData.map(o => (
-                                        <option key={o.observacion_id} value={o.observacion_id}>{o.name} - {o.asignatura} ({o.fecha})</option>
+                                        <option key={o.observacion_id} value={o.observacion_id}>
+                                            {o.name} - {o.asignatura} ({formatObsDate(o.fecha)})
+                                        </option>
                                     ))}
                                 </select>
                             </div>
@@ -357,7 +464,7 @@ const App = () => {
                                 <div className="meta-item"><b>Docente:</b> <span>{displayData.name}</span></div>
                                 <div className="meta-item"><b>Asignatura:</b> <span>{displayData.asignatura}</span></div>
                                 <div className="meta-item"><b>Curso:</b> <span>{displayData.curso}</span></div>
-                                <div className="meta-item"><b>Fecha:</b> <span>{displayData.fecha}</span></div>
+                                <div className="meta-item"><b>Fecha:</b> <span>{formatObsDate(displayData.fecha)}</span></div>
                                 <div className="meta-item"><b>Observador:</b> <span>{displayData.observador}</span></div>
                             </div>
                         ) : (

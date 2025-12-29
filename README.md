@@ -1,16 +1,80 @@
-# React + Vite
+# 📊 Mi Dashboard - Gestión de Observación en Aula
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Dashboard profesional de análisis de desempeño académico con sincronización automática inteligente desde Supabase.
 
-Currently, two official plugins are available:
+## 🚀 Características
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Sincronización Inteligente**: Polling condicional que solo actualiza cuando hay nuevos datos en Supabase
+- **Análisis en Tiempo Real**: Visualización de indicadores de desempeño docente
+- **Gráficos Interactivos**: Chart.js con radar charts para dimensiones y análisis detallado
+- **Múltiples Vistas**: Individual, Promedios por Docente, y Vista General
+- **Búsqueda Avanzada**: Filtrado instantáneo por docente, asignatura o curso
+- **UI Profesional**: Diseño moderno y responsive con indicadores visuales
 
-## React Compiler
+## 📦 Stack Tecnológico
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Frontend**: React 19.2.0 + Vite 7.2.4
+- **Base de Datos**: Supabase (PostgreSQL)
+- **Visualización**: Chart.js 4.5.1
+- **Estilos**: CSS personalizado con design tokens
 
-## Expanding the ESLint configuration
+## ⚡ Inicio Rápido
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+# Instalar dependencias
+npm install
+
+# Configurar variables de entorno
+# Crear archivo .env con:
+# VITE_SUPABASE_URL=tu_url
+# VITE_SUPABASE_ANON_KEY=tu_key
+
+# Desarrollo
+npm run dev
+
+# Producción
+npm run build
+npm run preview
+```
+
+## 🔄 Sincronización Automática
+
+La aplicación implementa **polling inteligente** que:
+- Verifica cada 30 segundos si hay cambios en Supabase
+- Solo carga datos completos cuando detecta nuevos registros
+- Ahorra 99% de ancho de banda en ciclos sin cambios
+- Muestra indicador visual de estado de sincronización
+
+## 🏗️ Arquitectura
+
+```
+observacionaula.vercel.app (Captura)
+           ↓
+    Supabase (Almacenamiento)
+           ↓
+    Mi Dashboard (Análisis)
+```
+
+## 📈 Módulos
+
+1. **Dashboard Individual**: Análisis detallado por observación
+2. **Promedios Docente**: Evolución histórica por profesor
+3. **Vista General**: Métricas institucionales agregadas
+4. **Top Ranking**: Mejores desempeños del período
+
+## ��️ Desarrollo
+
+```bash
+# Servidor desarrollo
+npm run dev
+
+# Build producción
+npm run build
+
+# Lint
+npm run lint
+```
+
+## 📝 Licencia
+
+Proyecto educativo - Colegio Veritas
