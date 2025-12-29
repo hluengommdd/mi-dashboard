@@ -3,6 +3,24 @@ import { supabase } from './supabase';
 import Chart from 'chart.js/auto';
 import './App.css';
 
+const Toast = ({ message, type = 'info', duration = 4000 }) => {
+    const [isVisible, setIsVisible] = useState(true);
+    useEffect(() => {
+        const timer = setTimeout(() => setIsVisible(false), duration);
+        return () => clearTimeout(timer);
+    }, [duration]);
+    if (!isVisible) return null;
+    return (
+        <div className={`toast toast-${type}`}>
+            {type === 'error' && '❌'} {type === 'success' && '✅'} {type === 'info' && 'ℹ️'} {message}
+        </div>
+    );
+};
+
+const Tooltip = ({ text, children }) => {
+    return <div className="tooltip-wrapper">{children}<span className="tooltip-text">{text}</span></div>;
+};
+
 const App = () => {
     // --- ESTADO ---
     const [loading, setLoading] = useState(true);
@@ -14,6 +32,7 @@ const App = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [lastSync, setLastSync] = useState(null);
     const [syncStatus, setSyncStatus] = useState('🔄 Sincronizando...');
+    const [toasts, setToasts] = useState([]);
 
     const formatObsDate = (dateString) => {
         if (!dateString) return '';
@@ -22,6 +41,12 @@ const App = () => {
         const day = `${d.getDate()}`.padStart(2, '0');
         const month = `${d.getMonth() + 1}`.padStart(2, '0');
         return `${day}/${month}`;
+    };
+
+    const showToast = (message, type = 'info') => {
+        const id = Math.random();
+        setToasts(prev => [...prev, { id, message, type }]);
+        setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 4000);
     };
 
     // Refs para los gráficos
@@ -52,6 +77,7 @@ const App = () => {
             return false;
         } catch (error) {
             console.error('Error verificando cambios:', error);
+            showToast('Error al verificar cambios en Supabase', 'error');
             return false;
         }
     };
@@ -109,6 +135,7 @@ const App = () => {
             } catch (error) {
                 console.error("Error cargando datos:", error);
                 setSyncStatus('❌ Error');
+                showToast('No se pudieron cargar los datos. Verifica tu conexión.', 'error');
             } finally {
                 setLoading(false);
             }
@@ -314,6 +341,7 @@ const App = () => {
     if (loading) {
         return (
             <div id="loadingOverlay">
+                {toasts.map((t) => <Toast key={t.id} message={t.message} type={t.type} />)}
                 <div className="spinner"></div>
                 <p style={{ marginTop: '15px', fontWeight: 600, color: 'var(--gray-700)' }}>Sincronizando con Supabase...</p>
             </div>
@@ -322,6 +350,7 @@ const App = () => {
 
     return (
         <div className="app-container">
+            {toasts.map((t) => <Toast key={t.id} message={t.message} type={t.type} />)}
             <header className="app-header">
                 <div className="header-wrap">
                     <div className="brand">
@@ -394,34 +423,48 @@ const App = () => {
                     </div>
 
                     <div className="kpi-row">
-                        <div className="kpi-card kpi-total">
-                            <span className="kpi-label">Desempeño Global</span>
-                            <span className="kpi-val">{Math.round(displayData?.porcentaje_total || 0)}%</span>
-                        </div>
-                        <div className="kpi-card kpi-ambiente">
-                            <span className="kpi-label">Ambiente Aula</span>
-                            <span className="kpi-val">{Math.round(displayData?.puntos.ambiente || 0)}%</span>
-                        </div>
-                        <div className="kpi-card kpi-interaccion">
-                            <span className="kpi-label">Interacción</span>
-                            <span className="kpi-val">{Math.round(displayData?.puntos.interaccion || 0)}%</span>
-                        </div>
-                        <div className="kpi-card kpi-organizacion">
-                            <span className="kpi-label">Organización</span>
-                            <span className="kpi-val">{Math.round(displayData?.puntos.organizacion || 0)}%</span>
-                        </div>
-                        <div className="kpi-card kpi-tendencia">
-                            <span className="kpi-label">Tendencia Docente</span>
-                            <span className="kpi-val">{extraKPIs.tendencia}</span>
-                        </div>
-                        <div className="kpi-card kpi-critica">
-                            <span className="kpi-label">Dimensión Crítica</span>
-                            <span id="kpi-dimension-critica" className="kpi-val">{extraKPIs.critica}</span>
-                        </div>
-                        <div className="kpi-card kpi-bajo">
-                            <span className="kpi-label">Indicadores &lt; 60%</span>
-                            <span className="kpi-val">{extraKPIs.bajo}</span>
-                        </div>
+                        <Tooltip text="Promedio general de todas las dimensiones evaluadas">
+                            <div className="kpi-card kpi-total">
+                                <span className="kpi-label">Desempeño Global</span>
+                                <span className="kpi-val">{Math.round(displayData?.porcentaje_total || 0)}%</span>
+                            </div>
+                        </Tooltip>
+                        <Tooltip text="Evaluación del ambiente y clima del aula">
+                            <div className="kpi-card kpi-ambiente">
+                                <span className="kpi-label">Ambiente Aula</span>
+                                <span className="kpi-val">{Math.round(displayData?.puntos.ambiente || 0)}%</span>
+                            </div>
+                        </Tooltip>
+                        <Tooltip text="Calidad de la interacción docente-estudiante">
+                            <div className="kpi-card kpi-interaccion">
+                                <span className="kpi-label">Interacción</span>
+                                <span className="kpi-val">{Math.round(displayData?.puntos.interaccion || 0)}%</span>
+                            </div>
+                        </Tooltip>
+                        <Tooltip text="Estructura y organización de la clase">
+                            <div className="kpi-card kpi-organizacion">
+                                <span className="kpi-label">Organización</span>
+                                <span className="kpi-val">{Math.round(displayData?.puntos.organizacion || 0)}%</span>
+                            </div>
+                        </Tooltip>
+                        <Tooltip text="Tendencia de desempeño en el tiempo">
+                            <div className="kpi-card kpi-tendencia">
+                                <span className="kpi-label">Tendencia Docente</span>
+                                <span className="kpi-val">{extraKPIs.tendencia}</span>
+                            </div>
+                        </Tooltip>
+                        <Tooltip text="Dimensión con menor puntuación">
+                            <div className="kpi-card kpi-critica">
+                                <span className="kpi-label">Dimensión Crítica</span>
+                                <span id="kpi-dimension-critica" className="kpi-val">{extraKPIs.critica}</span>
+                            </div>
+                        </Tooltip>
+                        <Tooltip text="Indicadores por debajo del 60%">
+                            <div className="kpi-card kpi-bajo">
+                                <span className="kpi-label">Indicadores &lt; 60%</span>
+                                <span className="kpi-val">{extraKPIs.bajo}</span>
+                            </div>
+                        </Tooltip>
                     </div>
 
                     <div className="charts-grid">
@@ -437,8 +480,14 @@ const App = () => {
 
                     <div className="indicators-card">
                         <h3 style={{ fontSize: '1rem' }}>Análisis Detallado por Indicador</h3>
+                        {!displayData?.items || displayData.items.length === 0 ? (
+                            <div className="empty-state">
+                                <p style={{ fontSize: '1.1rem', fontWeight: 600, marginBottom: '8px' }}>📊 Sin indicadores</p>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>Selecciona una observación para ver los datos detallados</p>
+                            </div>
+                        ) : (
                         <div className="ind-grid">
-                            {displayData?.items.map((i, idx) => {
+                            {displayData.items.map((i, idx) => {
                                 const color = i.dimId === 1 ? 'var(--success)' : i.dimId === 2 ? 'var(--purple)' : 'var(--orange)';
                                 return (
                                     <div key={idx} className="ind-item">
@@ -453,6 +502,7 @@ const App = () => {
                                 );
                             })}
                         </div>
+                        )}
                     </div>
                 </div>
 
