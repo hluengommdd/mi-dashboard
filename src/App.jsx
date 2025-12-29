@@ -34,8 +34,6 @@ const App = () => {
     const [syncStatus, setSyncStatus] = useState('🔄 Sincronizando...');
     const [toasts, setToasts] = useState([]);
     const [showGeneralAverage, setShowGeneralAverage] = useState(true);
-    const [dateFilterFrom, setDateFilterFrom] = useState('');
-    const [dateFilterTo, setDateFilterTo] = useState('');
 
     const formatObsDate = (dateString) => {
         if (!dateString) return '';
@@ -243,16 +241,6 @@ const App = () => {
         return [...teachersData].sort((a, b) => b.porcentaje_total - a.porcentaje_total).slice(0, 5);
     }, [teachersData]);
 
-    const filteredData = useMemo(() => {
-        if (!dateFilterFrom && !dateFilterTo) return teachersData;
-        return teachersData.filter(obs => {
-            const obsDate = new Date(obs.fecha);
-            const from = dateFilterFrom ? new Date(dateFilterFrom) : new Date(0);
-            const to = dateFilterTo ? new Date(dateFilterTo) : new Date(9999, 11, 31);
-            return obsDate >= from && obsDate <= to;
-        });
-    }, [teachersData, dateFilterFrom, dateFilterTo]);
-
     // --- ACTUALIZACIÓN DE GRÁFICOS ---
     useEffect(() => {
         if (!displayData) return;
@@ -432,48 +420,6 @@ const App = () => {
                                     }
                                 </select>
                             </div>
-                        )}
-                    </div>
-
-                    <div className="filter-card" style={{ marginBottom: '1.5rem' }}>
-                        <label style={{ fontSize: '0.85rem', fontWeight: 700, marginBottom: '12px', display: 'block' }}>FILTROS AVANZADOS:</label>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                            <div>
-                                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Desde:</label>
-                                <input 
-                                    type="date" 
-                                    value={dateFilterFrom} 
-                                    onChange={(e) => setDateFilterFrom(e.target.value)}
-                                    style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid rgba(148, 163, 184, 0.22)', marginTop: '4px', fontSize: '0.9rem' }}
-                                />
-                            </div>
-                            <div>
-                                <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontWeight: 600 }}>Hasta:</label>
-                                <input 
-                                    type="date" 
-                                    value={dateFilterTo} 
-                                    onChange={(e) => setDateFilterTo(e.target.value)}
-                                    style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid rgba(148, 163, 184, 0.22)', marginTop: '4px', fontSize: '0.9rem' }}
-                                />
-                            </div>
-                        </div>
-                        {(dateFilterFrom || dateFilterTo) && (
-                            <button 
-                                onClick={() => { setDateFilterFrom(''); setDateFilterTo(''); }}
-                                style={{ 
-                                    marginTop: '10px', 
-                                    padding: '8px 12px', 
-                                    background: 'var(--gray-200)', 
-                                    color: 'var(--text-secondary)', 
-                                    border: 'none', 
-                                    borderRadius: '8px', 
-                                    cursor: 'pointer', 
-                                    fontSize: '0.8rem',
-                                    fontWeight: 600
-                                }}
-                            >
-                                ✕ Limpiar filtros
-                            </button>
                         )}
                     </div>
 
